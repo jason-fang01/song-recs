@@ -1,0 +1,62 @@
+/* Reset some default browser styles */
+body,
+h1,
+p,
+ul,
+li {
+	margin: 0;
+	padding: 0;
+	font-family: "Arial", sans-serif;
+}
+
+body {
+	background-color: #f4f4f4;
+	color: #333;
+	font-size: 16px;
+	line-height: 1.5;
+}
+
+.container {
+	max-width: 800px;
+	margin: 30px auto;
+	padding: 20px;
+	background-color: #fff;
+	box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+h1 {
+	font-size: 24px;
+	margin-bottom: 20px;
+	text-align: center;
+	color: #1ed760;
+}
+
+.details {
+	background-color: #f9f9f9;
+	padding: 15px;
+	margin-bottom: 20px;
+	border: 1px solid #eaeaea;
+}
+
+.details p {
+	margin-bottom: 10px;
+	font-size: 18px;
+}
+
+.song-list {
+	list-style-type: none;
+}
+
+.song-list li {
+	padding: 10px;
+	border-bottom: 1px solid #eaeaea;
+	font-size: 18px;
+}
+
+.song-list li:last-child {
+	border-bottom: none;
+}
+
+.song-list strong {
+	color: #2c3e50;
+}

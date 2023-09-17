@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<link rel="stylesheet" href="/css/style.css" />
+		<title>Song Recommendations</title>
+	</head>
+
+	<body>
+		<div class="container">
+			<h1>Song Recommendations For Your Current Moment</h1>
+			<div class="details">
+				<p>City: <%= city %></p>
+				<p>Time: <%= time %></p>
+				<p>
+					Weather: <%= weatherDescription %> and feels like <%=
+					feelsLike %>°C
+				</p>
+			</div>
+			<ul class="song-list">
+				<% songs.forEach(song => { %>
+				<li>
+					<strong><%= song.title %></strong> by <%= song.artist %>
+				</li>
+				<% }); %>
+			</ul>
+		</div>
+	</body>
+</html>
