@@ -21,7 +21,10 @@
 			<ul class="song-list">
 				<% songs.forEach(song => { %>
 				<li>
-					<strong><%= song.title %></strong> by <%= song.artist %>
+					<strong
+						><a href="<%= song.url %>"><%= song.title %></a></strong
+					>
+					by <%= song.artist %>
 				</li>
 				<% }); %>
 			</ul>

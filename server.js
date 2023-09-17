@@ -1,6 +1,7 @@
 const express = require("express");
 const axios = require("axios");
 const OpenAI = require("openai");
+const spotifyService = require("./spotifyService");
 
 const { formatTime } = require("./utils/dateUtils");
 const { capitalizeFirstLetter } = require("./utils/stringUtils");
@@ -29,7 +30,7 @@ app.get("/", async (req, res) => {
 				{
 					role: "system",
 					content:
-						"You will be provided with the city name, local time, and weather details ('description' and 'feels like') of a user. \n\nUsing the given input I want you to recommend at least 10 songs that would fit the time, place, and weather. \n\nFor example, if the time was 7:30AM and sunny weather, you should recommend songs that would make someone feel excited to get the day started and woken up. Additionally, if the city was Paris, it would make sense for the song recommendations to be french.\n\nThe output of your response should be in the format of JSON. The JSON should contain only 'title' and 'artist' keys.\n\n", // truncated for brevity
+						"You will be provided with the city name, local time, and weather details ('description' and 'feels like') of a user. \n\nUsing the given input I want you to recommend at least 5 songs that would fit the time, place, and weather. \n\nFor example, if the time was 7:30AM and sunny weather, you should recommend songs that would make someone feel excited to get the day started and woken up. Additionally, if the city was Paris, it would make sense for the song recommendations to be french.\n\nThe output of your response should be in the format of JSON. The JSON should contain only 'title' and 'artist' keys.\n\n", // truncated for brevity
 				},
 				{
 					role: "user",
@@ -48,13 +49,29 @@ app.get("/", async (req, res) => {
 		);
 
 		// Debugging
-		// console.log(
-		// 	"Sending the following request body to OpenAI:",
-		// 	requestBody
-		// );
-		// console.log("OpenAI Response Choices:", openaiResponse.choices[0]);
+		console.log(
+			"Sending the following request body to OpenAI:",
+			requestBody
+		);
+		console.log("OpenAI Response Choices:", openaiResponse.choices[0]);
 
 		const responseContent = openaiResponse.choices[0]?.message?.content;
+		const songsFromOpenAI = JSON.parse(responseContent).songs;
+
+		// Collect Spotify URLs for the songs
+		const songsWithSpotifyLinks = [];
+		for (const song of songsFromOpenAI) {
+			const trackData = await spotifyService.getSpotifyData(
+				`search?q=${song.title}&type=track&limit=1`
+			);
+			const trackURL =
+				trackData?.tracks?.items[0]?.external_urls?.spotify;
+			songsWithSpotifyLinks.push({
+				title: song.title,
+				artist: song.artist,
+				url: trackURL,
+			});
+		}
 
 		// Transform data to be more readable
 		const formattedTime = formatTime(currentDatetime);
@@ -67,7 +84,7 @@ app.get("/", async (req, res) => {
 			time: formattedTime,
 			weatherDescription: capitalizedWeatherDescription,
 			feelsLike: weatherDetails.feels_like,
-			songs: JSON.parse(responseContent).songs,
+			songs: songsWithSpotifyLinks,
 		});
 	} catch (error) {
 		if (error.service) {
@@ -81,8 +98,9 @@ app.get("/", async (req, res) => {
 	}
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
 	console.log(`Server running on http://localhost:${PORT}`);
+	await spotifyService.authenticateWithSpotify();
 });
 
 async function getIPAddress() {
