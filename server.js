@@ -1,62 +1,97 @@
+// Required modules and services
 const express = require("express");
-const axios = require("axios");
 const OpenAI = require("openai");
 const spotifyService = require("./spotifyService");
+const {
+	getIPAddress,
+	getCity,
+	getLocalTime,
+	getWeather,
+} = require("./utils/apiCalls");
 
+// Utility functions for date and string manipulation
 const { formatTime } = require("./utils/dateUtils");
 const { capitalizeFirstLetter } = require("./utils/stringUtils");
 
+// Load environment variables from .env file
 require("dotenv").config();
 
 const app = express();
 const PORT = 3000;
 
+// Initialize OpenAI with API key from environment variables
 const openai = new OpenAI({
 	apiKey: process.env.OPENAI_KEY,
 });
 
+// Middleware to serve static files from 'public' directory
 app.use(express.static("public"));
+// Setting EJS as the view engine for rendering pages
 app.set("view engine", "ejs");
 
+// Root route to fetch and display song recommendations
 app.get("/", async (req, res) => {
 	try {
+		// Fetch IP address, city, local time, and weather details
 		const ipAddress = await getIPAddress();
 		const city = await getCity(ipAddress);
 		const currentDatetime = await getLocalTime(ipAddress);
 		const weatherDetails = await getWeather(city);
+
+		// Convert the 'currentDatetime' using your utility function
+		const formattedTime = formatTime(currentDatetime);
+
+		// Constructing the input in a  clear format for better output (recommendations)
+		const openaiInput = `${city}, ${formattedTime}, ${
+			weatherDetails.description
+		}, feels like ${Math.round(weatherDetails.feels_like)} degrees`;
+
+		// Configure request body for OpenAI API call
 		const requestBody = {
-			model: "gpt-3.5-turbo",
+			model: "gpt-3.5-turbo-16k",
 			messages: [
 				{
 					role: "system",
 					content:
-						"You will be provided with the city name, local time, and weather details ('description' and 'feels like') of a user. \n\nUsing the given input I want you to recommend at least 5 songs that would fit the time, place, and weather. \n\nFor example, if the time was 7:30AM and sunny weather, you should recommend songs that would make someone feel excited to get the day started and woken up. Additionally, if the city was Paris, it would make sense for the song recommendations to be french.\n\nThe output of your response should be in the format of JSON. The JSON should contain only 'title' and 'artist' keys.\n\n", // truncated for brevity
+						"You will be provided with a city name, local time, and weather details ('description' and 'feels like') of a user. Based on this information, please recommend at least 10 songs that relate to the time, place, and weather. The output should be in JSON format, containing an array named 'songs', where each entry is an object with 'title' and 'artist' keys. For example: `\"songs\": [{\"title\": \"Song Name\", \"artist\": \"Artist Name\"}, ...]`.",
 				},
 				{
 					role: "user",
-					content: `{"city":"${city}","currentDatetime":"${currentDatetime}","weatherDetails":{"description":"${weatherDetails.description}","feels_like":${weatherDetails.feels_like}}}`,
+					content: openaiInput,
 				},
 			],
 			temperature: 1,
-			max_tokens: 2048,
+			max_tokens: 1024,
 			top_p: 1,
 			frequency_penalty: 0,
 			presence_penalty: 0,
 		};
 
+		// Make API call to OpenAI
 		const openaiResponse = await openai.chat.completions.create(
 			requestBody
 		);
 
-		// Debugging
+		// Log the request and response for debugging purposes
 		console.log(
 			"Sending the following request body to OpenAI:",
 			requestBody
 		);
 		console.log("OpenAI Response Choices:", openaiResponse.choices[0]);
 
+		// Extract song recommendations from OpenAI response
 		const responseContent = openaiResponse.choices[0]?.message?.content;
-		const songsFromOpenAI = JSON.parse(responseContent).songs;
+
+		// Replacing inner double quotes with escaped quotes
+		const sanitizedContent = responseContent.replace(
+			/"([^"]+)"/g,
+			(match, innerContent) => {
+				return `"${innerContent.replace(/"/g, '\\"')}"`;
+			}
+		);
+
+		// Parsing the sanitized JSON
+		const songsFromOpenAI = JSON.parse(sanitizedContent).songs;
 
 		// Collect Spotify URLs for the songs
 		const songsWithSpotifyLinks = [];
@@ -74,11 +109,11 @@ app.get("/", async (req, res) => {
 		}
 
 		// Transform data to be more readable
-		const formattedTime = formatTime(currentDatetime);
 		const capitalizedWeatherDescription = capitalizeFirstLetter(
 			weatherDetails.description
 		);
 
+		// Render the songs page with fetched data
 		res.render("songs", {
 			city: city,
 			time: formattedTime,
@@ -98,60 +133,8 @@ app.get("/", async (req, res) => {
 	}
 });
 
+// Start the server and authenticate with Spotify
 app.listen(PORT, async () => {
 	console.log(`Server running on http://localhost:${PORT}`);
 	await spotifyService.authenticateWithSpotify();
 });
-
-async function getIPAddress() {
-	try {
-		const ipifyResponse = await axios.get(
-			"https://api.ipify.org?format=json"
-		);
-		return ipifyResponse.data.ip;
-	} catch (error) {
-		error.service = "IP Address Retrieval";
-		throw error;
-	}
-}
-async function getCity(ipAddress) {
-	try {
-		const ipstackResponse = await axios.get(
-			`http://api.ipstack.com/${ipAddress}?access_key=${process.env.IPSTACK_KEY}`
-		);
-		return ipstackResponse.data.city;
-	} catch (error) {
-		error.service = "City Retrieval";
-		throw error;
-	}
-}
-
-async function getLocalTime(ipAddress) {
-	try {
-		const worldTimeResponse = await axios.get(
-			`http://worldtimeapi.org/api/ip/${ipAddress}.txt`
-		);
-		const datetimeLine = worldTimeResponse.data
-			.split("\n")
-			.find((line) => line.startsWith("datetime:"));
-		return datetimeLine ? datetimeLine.split(": ")[1] : null;
-	} catch (error) {
-		error.service = "Local Time Retrieval";
-		throw error;
-	}
-}
-
-async function getWeather(city) {
-	try {
-		const weatherResponse = await axios.get(
-			`http://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${process.env.OPENWEATHER_KEY}&units=metric`
-		);
-		return {
-			description: weatherResponse.data.weather[0].description,
-			feels_like: weatherResponse.data.main.feels_like,
-		};
-	} catch (error) {
-		error.service = "Weather Data Retrieval";
-		throw error;
-	}
-}
