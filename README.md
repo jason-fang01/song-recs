@@ -1,6 +1,6 @@
 # Song Recommendation Engine 🎶
 
-This web application leverages the power of OpenAI and Spotify's APIs to provide song recommendations. Based on the user's location, local time, and current weather conditions, our engine crafts a playlist to match the mood.
+This web application leverages the power of OpenAI and Spotify's APIs to provide song recommendations. Based on the user's location, local time, and current weather conditions, this engine crafts a playlist to match the mood.
 
 ## Features
 
